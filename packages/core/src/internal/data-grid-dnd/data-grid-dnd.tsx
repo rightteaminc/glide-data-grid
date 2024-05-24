@@ -379,6 +379,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             drawFocusRing={p.drawFocusRing}
             drawHeader={p.drawHeader}
             drawCell={p.drawCell}
+            dragImageAnchor={p.dragImageAnchor}
             enableGroups={p.enableGroups}
             eventTargetRef={p.eventTargetRef}
             experimental={p.experimental}
