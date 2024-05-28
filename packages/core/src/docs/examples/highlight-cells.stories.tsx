@@ -64,6 +64,26 @@ export const HighlightCells: React.VFC = () => {
                     height: 1,
                 },
             },
+            {
+                color: "black",
+                range: {
+                    x: col - 1,
+                    y: row,
+                    width: 1,
+                    height: 1,
+                },
+                style: "no-fill-bottom",
+            },
+            {
+                color: "black",
+                range: {
+                    x: col - 1,
+                    y: row ,
+                    width: 1,
+                    height: 1,
+                },
+                style: "no-fill-top",
+            },
         ];
     }, [gridSelection]);
 

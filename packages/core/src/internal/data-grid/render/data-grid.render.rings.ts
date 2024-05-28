@@ -108,7 +108,7 @@ export function drawHighlightRings(
         ctx.lineWidth = 1;
 
         let dashed = false;
-
+        
         for (const dr of drawRects) {
             for (const s of dr) {
                 if (
@@ -125,7 +125,7 @@ export function drawHighlightRings(
                     if (s.style === "dashed" && !dashed) {
                         ctx.setLineDash([5, 3]);
                         dashed = true;
-                    } else if ((s.style === "solid" || s.style === "solid-outline") && dashed) {
+                    } else if (["solid", "solid-outline", "no-fill-top", "no-fill-bottom"].includes(s.style) && dashed) {
                         ctx.setLineDash([]);
                         dashed = false;
                     }
@@ -133,7 +133,21 @@ export function drawHighlightRings(
                         s.style === "solid-outline"
                             ? blend(blend(s.color, theme.borderColor), theme.bgCell)
                             : withAlpha(s.color, 1);
-                    ctx.strokeRect(s.rect.x + 0.5, s.rect.y + 0.5, s.rect.width - 1, s.rect.height - 1);
+
+                    if (s.style !== "no-fill-top" && s.style !== 'no-fill-bottom'){
+                        ctx.strokeRect(s.rect.x + 0.5, s.rect.y + 0.5, s.rect.width - 1, s.rect.height - 1);
+                    }
+
+                    if (s.style === "no-fill-top"){
+                        ctx.fillStyle = blend(blend(s.color, theme.borderColor), theme.bgCell);
+                        ctx.fillRect(s.rect.x + 0.5, s.rect.y, s.rect.width - 1, 1);
+                    }
+
+                    if (s.style === "no-fill-bottom"){
+                        ctx.fillStyle = blend(blend(s.color, theme.borderColor), theme.bgCell);
+                        ctx.fillRect(s.rect.x + 0.5, s.rect.y + s.rect.height - 1, s.rect.width - 1, 1);
+                    }
+                    
                     if (needsClip) {
                         ctx.restore();
                         dashed = wasDashed;
