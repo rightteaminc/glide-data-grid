@@ -56,7 +56,7 @@ export type GetRowThemeCallback = (row: number) => Partial<Theme> | undefined;
 export interface Highlight {
     readonly color: string;
     readonly range: Rectangle;
-    readonly style?: "dashed" | "solid" | "no-outline" | "solid-outline";
+    readonly style?: "dashed" | "solid" | "no-outline" | "solid-outline" | "no-fill-top" | "no-fill-bottom";
 }
 
 // preppable items:
@@ -320,6 +320,8 @@ export function drawCells(
                             const region = highlightRegions[i];
                             const r = region.range;
                             if (
+                                region.style !== "no-fill-bottom" &&
+                                region.style !== "no-fill-top" &&
                                 region.style !== "solid-outline" &&
                                 r.x <= c.sourceIndex &&
                                 c.sourceIndex < r.x + r.width &&
