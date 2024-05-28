@@ -195,7 +195,7 @@ export interface DataGridProps {
     * @defaultValue 'center'
     * @group Drag and Drop
     */
-    readonly dragImageAnchor: 'center' | 'click' | 'click-x' | 'click-y' | undefined;
+    readonly dragImageAnchor?: 'center' | 'click' | 'click-x' | 'click-y' | undefined;
     /**
      * If `isDraggable` is set, the grid becomes HTML draggable, and `onDragStart` will be called when dragging starts.
      * You can use this to build a UI where the user can drag the Grid around.
@@ -1597,6 +1597,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             isResizing,
             getMouseArgsForPosition,
             onDragStart,
+            dragImageAnchor,
             getBoundsForItem,
             theme,
             mappedColumns,
