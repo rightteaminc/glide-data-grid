@@ -1594,6 +1594,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         },
         [
             isDraggable,
+            dragImageAnchor,
             isResizing,
             getMouseArgsForPosition,
             onDragStart,

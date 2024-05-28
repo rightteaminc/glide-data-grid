@@ -269,7 +269,7 @@ export function isReadWriteCell(cell: GridCell): cell is ReadWriteGridCell {
     ) {
         return cell.readonly !== true;
     }
-    assertNever(cell, "A cell was passed with an invalid kind");
+    assertNever(cell as never, "A cell was passed with an invalid kind");
 }
 
 /** @category Cells */
