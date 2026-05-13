@@ -4,9 +4,24 @@ import {
     type CustomRenderer,
     getMiddleCenterBias,
     GridCellKind,
+    getEmHeight,
 } from "@glideapps/glide-data-grid";
 import * as React from "react";
 import { roundedRect } from "../draw-fns.js";
+
+function adaptFontSize(font: string, percentage: number): string {
+    const regex = /(\d+\.?\d*)\s*(px|rem|em|%|pt)/;
+    const match = font.match(regex);
+
+    if (match) {
+        const value = parseFloat(match[1]);
+        const unit = match[2];
+        const scaledValue = value * percentage;
+        return font.replace(regex, `${Number(scaledValue.toPrecision(3))}${unit}`);
+    }
+
+    return font;
+}
 
 interface RangeCellProps {
     readonly kind: "range-cell";
@@ -16,11 +31,11 @@ interface RangeCellProps {
     readonly step: number;
     readonly label?: string;
     readonly measureLabel?: string;
+    /* The color of the range, fallback to theme.accentColor. */
+    readonly color?: string;
 }
 
 export type RangeCell = CustomCell<RangeCellProps>;
-
-const RANGE_HEIGHT = 6;
 
 const inputStyle: React.CSSProperties = {
     marginRight: 8,
@@ -37,46 +52,50 @@ const renderer: CustomRenderer<RangeCell> = {
     isMatch: (c): c is RangeCell => (c.data as any).kind === "range-cell",
     draw: (args, cell) => {
         const { ctx, theme, rect } = args;
-        const { min, max, value, label, measureLabel } = cell.data;
+        const { min, max, value, label, measureLabel, color } = cell.data;
 
         const x = rect.x + theme.cellHorizontalPadding;
         const yMid = rect.y + rect.height / 2;
 
         const rangeSize = max - min;
         const fillRatio = (value - min) / rangeSize;
+        // Only use 90% of the base font size for the label
+        const labelFont = `${adaptFontSize(theme.baseFontStyle, 0.9)} ${theme.fontFamily}`;
+
+        const emHeight = getEmHeight(ctx, labelFont);
+        const rangeHeight = emHeight / 2;
 
         ctx.save();
         let labelWidth = 0;
         if (label !== undefined) {
-            ctx.font = `12px ${theme.fontFamily}`; // fixme this is slow
-            labelWidth =
-                measureTextCached(measureLabel ?? label, ctx, `12px ${theme.fontFamily}`).width +
-                theme.cellHorizontalPadding;
+            ctx.font = labelFont; // fixme this is slow
+            labelWidth = measureTextCached(measureLabel ?? label, ctx, labelFont).width + theme.cellHorizontalPadding;
         }
 
         const rangeWidth = rect.width - theme.cellHorizontalPadding * 2 - labelWidth;
 
-        if (rangeWidth >= RANGE_HEIGHT) {
+        if (rangeWidth >= rangeHeight) {
             const gradient = ctx.createLinearGradient(x, yMid, x + rangeWidth, yMid);
 
-            gradient.addColorStop(0, theme.accentColor);
-            gradient.addColorStop(fillRatio, theme.accentColor);
+            const fillColor = color ?? theme.accentColor;
+            gradient.addColorStop(0, fillColor);
+            gradient.addColorStop(fillRatio, fillColor);
             gradient.addColorStop(fillRatio, theme.bgBubble);
             gradient.addColorStop(1, theme.bgBubble);
 
             ctx.beginPath();
             ctx.fillStyle = gradient;
-            roundedRect(ctx, x, yMid - RANGE_HEIGHT / 2, rangeWidth, RANGE_HEIGHT, RANGE_HEIGHT / 2);
+            roundedRect(ctx, x, yMid - rangeHeight / 2, rangeWidth, rangeHeight, rangeHeight / 2);
             ctx.fill();
 
             ctx.beginPath();
             roundedRect(
                 ctx,
                 x + 0.5,
-                yMid - RANGE_HEIGHT / 2 + 0.5,
+                yMid - rangeHeight / 2 + 0.5,
                 rangeWidth - 1,
-                RANGE_HEIGHT - 1,
-                (RANGE_HEIGHT - 1) / 2
+                rangeHeight - 1,
+                (rangeHeight - 1) / 2
             );
             ctx.strokeStyle = theme.accentLight;
             ctx.lineWidth = 1;
@@ -89,7 +108,7 @@ const renderer: CustomRenderer<RangeCell> = {
             ctx.fillText(
                 label,
                 rect.x + rect.width - theme.cellHorizontalPadding,
-                yMid + getMiddleCenterBias(ctx, `12px ${theme.fontFamily}`)
+                yMid + getMiddleCenterBias(ctx, labelFont)
             );
         }
 

@@ -254,7 +254,9 @@ The global theme is provided by the DataEditor by default and can be overriden b
 | bgIconHeader | --gdg-bg-icon-header | string | The background color for header icons |
 | fgIconHeader | --gdg-fg-icon-header | string | The foreground color for header icons |
 | textHeader | --gdg-text-header | string | The header text color |
-| textGroupHeader | --gdg-text-group-header | string \\| undefined | The group header text color, if none provided the \`textHeader\` is used instead. |
+| bgGroupHeader | --gdg-bg-group-header | string | The group header background color, if none provided the \`bgHeader\` is used instead. |
+| bgGroupHeaderHovered | --gdg-bg-group-header-hovered | string | The group header background color when it is hovered, if none provided the \`bgHeaderHovered\` is used instead. |
+| textGroupHeader | --gdg-text-group-header | string | The group header text color, if none provided the \`textHeader\` is used instead. |
 | textHeaderSelected | --gdg-text-header-selected | string | The text color used for selected headers |
 | bgCell | --gdg-bg-cell | string | The primary background color of the data grid. |
 | bgCellMedium | --gdg-bg-cell-medium | string | Used for disabled or otherwise off colored cells. |
@@ -275,16 +277,18 @@ The global theme is provided by the DataEditor by default and can be overriden b
 | fontFamily | --gdg-font-family | string | The font family used by the data grid. |
 | editorFontSize | --gdg-editor-font-size | string | The font size used by overlay editors. |
 | lineHeight | None | number | A unitless scaler which defines the height of a line of text relative to the ink size. |
+| checkboxMaxSize | --gdg-checkbox-max-size | number | The maximum size of checkboxes (in pixels), e.g. for boolean cell and row markers. |
+| roundingRadius | --gdg-rounding-radius | number | The radius of rounded corners used by various grid elements (in pixels). |
 
 If an option is missing from any theme it will be filled in with the default theme.
 `}
             </Marked>
             <Highlight>
                 {`
-return <DataEditor 
+return <DataEditor
         theme={{
           bgCell: "#F2F9FF"
-        }} 
+        }}
         getCellContent={getContent} columns={columns} rows={data.length} />
 `}
             </Highlight>
@@ -376,7 +380,7 @@ const getContent = React.useCallback((cell: Item): GridCell => {
             textDark: "#FF0000",
         }
     }
-    
+
     const d = getDataForCell(col, row);
     return {
         kind: GridCellKind.Text,

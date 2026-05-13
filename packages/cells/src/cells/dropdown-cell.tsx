@@ -62,7 +62,7 @@ const ReadOnlyWrap = styled.div`
 `;
 
 const Editor: ReturnType<ProvideEditorCallback<DropdownCell>> = p => {
-    const { value: cell, onFinishedEditing, initialValue } = p;
+    const { value: cell, onFinishedEditing, initialValue, portalElementRef } = p;
     const { allowedValues, value: valueIn } = cell.data;
 
     const [value, setValue] = React.useState(valueIn);
@@ -151,7 +151,7 @@ const Editor: ReturnType<ProvideEditorCallback<DropdownCell>> = p => {
                         },
                     };
                 }}
-                menuPortalTarget={document.getElementById("portal")}
+                menuPortalTarget={portalElementRef?.current ??  document.getElementById("portal")}
                 autoFocus={true}
                 openMenuOnFocus={true}
                 components={{
@@ -223,7 +223,13 @@ const renderer: CustomRenderer<DropdownCell> = {
     }),
     onPaste: (v, d) => ({
         ...d,
-        value: d.allowedValues.includes(v) ? v : d.value,
+        value: d.allowedValues.some(option => {
+            if (option === null || option === undefined) return false;
+            if (typeof option === "string") return option === v;
+            return option.value === v;
+        })
+            ? v
+            : d.value,
     }),
 };
 

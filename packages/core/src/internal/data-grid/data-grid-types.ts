@@ -1,12 +1,12 @@
-import type { Theme } from "../../common/styles.js";
-import { assertNever, proveType } from "../../common/support.js";
 import has from "lodash/has.js";
 import type React from "react";
 import type { CSSProperties } from "react";
-import type { SpriteManager } from "./data-grid-sprites.js";
+import type { Theme } from "../../common/styles.js";
+import { assertNever, proveType } from "../../common/support.js";
 import type { OverlayImageEditorProps } from "../data-grid-overlay-editor/private/image-overlay-editor.js";
+import type { SpriteManager } from "./data-grid-sprites.js";
+import type { BaseGridMouseEventArgs, CellActivatedEventArgs } from "./event-args.js";
 import type { ImageWindowLoader } from "./image-window-loader-interface.js";
-import type { BaseGridMouseEventArgs } from "./event-args.js";
 
 // Thoughts:
 // rows/columns are called out as selected, but when selected they must also be added
@@ -51,6 +51,8 @@ export type DrawHeaderCallback = (
         hasSelectedCell: boolean;
         spriteManager: SpriteManager;
         menuBounds: Rectangle;
+        hoverX: number | undefined;
+        hoverY: number | undefined;
     },
     drawContent: () => void
 ) => void;
@@ -259,17 +261,17 @@ export function isInnerOnlyCell(cell: InnerGridCell): cell is InnerOnlyGridCell 
 export function isReadWriteCell(cell: GridCell): cell is ReadWriteGridCell {
     if (!isEditableGridCell(cell) || cell.kind === GridCellKind.Image) return false;
 
-    if (
-        cell.kind === GridCellKind.Text ||
-        cell.kind === GridCellKind.Number ||
-        cell.kind === GridCellKind.Markdown ||
-        cell.kind === GridCellKind.Uri ||
-        cell.kind === GridCellKind.Custom ||
-        cell.kind === GridCellKind.Boolean
-    ) {
-        return cell.readonly !== true;
+    switch (cell.kind) {
+        case GridCellKind.Text:
+        case GridCellKind.Number:
+        case GridCellKind.Markdown:
+        case GridCellKind.Uri:
+        case GridCellKind.Custom:
+        case GridCellKind.Boolean:
+            return cell.readonly !== true;
+        default:
+            assertNever(cell, "A cell was passed with an invalid kind");
     }
-    assertNever(cell, "A cell was passed with an invalid kind");
 }
 
 /** @category Cells */
@@ -303,7 +305,7 @@ export function isRectangleEqual(a: Rectangle | undefined, b: Rectangle | undefi
     return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
-export type CellActiviationBehavior = "double-click" | "single-click" | "second-click";
+export type CellActivationBehavior = "double-click" | "single-click" | "second-click";
 
 /** @category Cells */
 export interface BaseGridCell {
@@ -315,7 +317,7 @@ export interface BaseGridCell {
     readonly contentAlign?: "left" | "right" | "center";
     readonly cursor?: CSSProperties["cursor"];
     readonly copyData?: string;
-    readonly activationBehaviorOverride?: CellActiviationBehavior;
+    readonly activationBehaviorOverride?: CellActivationBehavior;
 }
 
 /** @category Cells */
@@ -393,6 +395,8 @@ export type ProvideEditorComponent<T extends InnerGridCell> = React.FunctionComp
     readonly forceEditMode: boolean;
     readonly isValid?: boolean;
     readonly theme: Theme;
+    readonly portalElementRef?: React.RefObject<HTMLElement>;
+    readonly activation?: CellActivatedEventArgs;
 }>;
 
 type ObjectEditorCallbackResult<T extends InnerGridCell> = {
@@ -420,7 +424,9 @@ export function isObjectEditorCallbackResult<T extends InnerGridCell>(
 }
 
 /** @category Renderers */
-export type ProvideEditorCallback<T extends InnerGridCell> = (cell: T) => ProvideEditorCallbackResult<T>;
+export type ProvideEditorCallback<T extends InnerGridCell> = (
+    cell: T & { location?: Item; activation?: CellActivatedEventArgs }
+) => ProvideEditorCallbackResult<T>;
 
 /** @category Cells */
 export type ValidatedGridCell = EditableGridCell & {
@@ -521,6 +527,36 @@ export type CompactSelectionRanges = readonly Slice[];
 
 export type FillHandleDirection = "horizontal" | "vertical" | "orthogonal" | "any";
 
+/**
+ * Configuration options for the fill-handle (the little drag square in the bottom-right of a selection).
+ *
+ *  `shape`   – Either a square or a circle. Default is `square`.
+ *  `size`    – Width/height (or diameter) in CSS pixels. Default is `4`.
+ *  `offsetX` – Horizontal offset from the bottom-right corner of the cell (positive is →). Default is `-2`.
+ *  `offsetY` – Vertical offset from the bottom-right corner of the cell (positive is ↓). Default is `-2`.
+ *  `outline` – Width of the outline stroke in CSS pixels. Default is `0`.
+ */
+export type FillHandleConfig = {
+    readonly shape: "square" | "circle";
+    readonly size: number;
+    readonly offsetX: number;
+    readonly offsetY: number;
+    readonly outline: number;
+};
+
+export type FillHandle = boolean | Partial<FillHandleConfig>;
+
+/**
+ * Default configuration used when `fillHandle` is simply `true`.
+ */
+export const DEFAULT_FILL_HANDLE: Readonly<FillHandleConfig> = {
+    shape: "square",
+    size: 4,
+    offsetX: -2,
+    offsetY: -2,
+    outline: 0,
+} as const;
+
 function mergeRanges(input: CompactSelectionRanges) {
     if (input.length === 0) {
         return [];
@@ -552,7 +588,11 @@ let emptyCompactSelection: CompactSelection | undefined;
 
 /** @category Selection */
 export class CompactSelection {
-    private constructor(private readonly items: CompactSelectionRanges) {}
+    private constructor(public readonly items: CompactSelectionRanges) {}
+
+    static create = (items: CompactSelectionRanges) => {
+        return new CompactSelection(mergeRanges(items));
+    };
 
     static empty = (): CompactSelection => {
         return emptyCompactSelection ?? (emptyCompactSelection = new CompactSelection([]));
@@ -560,6 +600,13 @@ export class CompactSelection {
 
     static fromSingleSelection = (selection: number | Slice) => {
         return CompactSelection.empty().add(selection);
+    };
+
+    static fromArray = (items: readonly number[]): CompactSelection => {
+        if (items.length === 0) return CompactSelection.empty();
+        const slices = items.map(s => [s, s + 1] as Slice);
+        const newItems = mergeRanges(slices);
+        return new CompactSelection(newItems);
     };
 
     public offset(amount: number): CompactSelection {
@@ -570,9 +617,7 @@ export class CompactSelection {
 
     public add(selection: number | Slice): CompactSelection {
         const slice: Slice = typeof selection === "number" ? [selection, selection + 1] : selection;
-
         const newItems = mergeRanges([...this.items, slice]);
-
         return new CompactSelection(newItems);
     }
 

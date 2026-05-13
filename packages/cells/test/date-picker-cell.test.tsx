@@ -17,6 +17,21 @@ describe("formatValueForHTMLInput", () => {
     ])("check %p format and %p date leads correct format: {%p}", (format: string, date: Date, valueForHTML: string) => {
         expect(formatValueForHTMLInput(format as DateKind, date)).toStrictEqual(valueForHTML);
     });
+
+    it.each([
+        ["datetime-local", new Date("2023-01-01T12:00:00.000Z"), 60 * 60 * 1000, "2023-01-01T13:00:00.000"],
+        ["datetime-local", new Date("2023-01-01T12:00:00.000Z"), -60 * 60 * 1000, "2023-01-01T11:00:00.000"],
+        ["date", new Date("2023-01-01T23:30:00.000Z"), 60 * 60 * 1000, "2023-01-02"],
+        ["date", new Date("2023-01-02T00:30:00.000Z"), -60 * 60 * 1000, "2023-01-01"],
+        ["time", new Date("1970-01-01T10:00:00.000Z"), 30 * 60 * 1000, "10:30:00.000"],
+        ["time", new Date("1970-01-01T10:00:00.000Z"), -30 * 60 * 1000, "09:30:00.000"],
+    ])(
+        "check %p format and %p date with timezoneOffsetMs %p leads to correct format: %p",
+        (format: string, date: Date, timezoneOffsetMs: number, valueForHTML: string) => {
+            expect(formatValueForHTMLInput(format as DateKind, date, timezoneOffsetMs)).toStrictEqual(valueForHTML);
+        }
+    );
+
     it("throws an error when a weird value is passed", () => {
         expect(() => formatValueForHTMLInput("weird" as DateKind, new Date())).toThrow("Unknown date kind weird");
     });
@@ -43,7 +58,10 @@ describe("editor", () => {
 
     it("renders into the dom with correct value", () => {
         // @ts-ignore
-        const Editor = renderer.provideEditor?.(getMockDateCell()).editor;
+        const Editor = renderer.provideEditor?.({
+            ...getMockDateCell(),
+            location: [0, 0],
+        }).editor;        
         if (Editor === undefined) {
             throw new Error("Editor is invalid");
         }
@@ -59,10 +77,10 @@ describe("editor", () => {
 
     it.each([["date"], ["time"], ["datetime-local"]])("renders with correct format", (format: string) => {
         // @ts-ignore
-        const Editor = renderer.provideEditor?.(
-            getMockDateCell({ data: { format: format } } as DatePickerCell)
-            // @ts-ignore
-        ).editor;
+        const Editor = renderer.provideEditor?.({
+            ...getMockDateCell({ data: { format: format } } as DatePickerCell),
+            location: [0, 0],
+        }).editor;
         if (Editor === undefined) {
             throw new Error("Editor is invalid");
         }
@@ -77,10 +95,10 @@ describe("editor", () => {
 
     it("renders textarea when readonly is true", () => {
         // @ts-ignore
-        const Editor = renderer.provideEditor?.(
-            getMockDateCell({ readonly: true } as DatePickerCell)
-            // @ts-ignore
-        ).editor;
+        const Editor = renderer.provideEditor?.({
+            ...getMockDateCell({ readonly: true } as DatePickerCell),
+            location: [0, 0],
+        }).editor;
         if (Editor === undefined) {
             throw new Error("Editor is invalid");
         }
@@ -103,7 +121,10 @@ describe("editor", () => {
         };
 
         // @ts-ignore
-        const Editor = renderer.provideEditor?.(getMockDateCell(extraProps)).editor;
+        const Editor = renderer.provideEditor?.({
+            ...getMockDateCell(extraProps),
+            location: [0, 0],
+        }).editor;
         if (Editor === undefined) {
             throw new Error("Editor is invalid");
         }
@@ -124,7 +145,10 @@ describe("editor", () => {
         const valueAsNumber = 100;
 
         // @ts-ignore
-        const Editor = renderer.provideEditor?.(getMockDateCell()).editor;
+        const Editor = renderer.provideEditor?.({
+            ...getMockDateCell(),
+            location: [0, 0],
+        }).editor;
         if (Editor === undefined) {
             throw new Error("Editor is invalid");
         }
@@ -156,7 +180,10 @@ describe("editor", () => {
 
     it('properly sets new date to undefined when value is ""', async () => {
         // @ts-ignore
-        const Editor = renderer.provideEditor?.(getMockDateCell()).editor;
+        const Editor = renderer.provideEditor?.({
+            ...getMockDateCell(),
+            location: [0, 0],
+        }).editor;
         if (Editor === undefined) {
             throw new Error("Editor is invalid");
         }
