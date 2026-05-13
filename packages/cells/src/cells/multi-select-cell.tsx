@@ -14,7 +14,7 @@ import {
 } from "@glideapps/glide-data-grid";
 
 import { styled } from "@linaria/react";
-import Select, { type MenuProps, components, type StylesConfig } from "react-select";
+import Select, { type MenuProps, type MultiValueGenericProps, components, type StylesConfig } from "react-select";
 import CreatableSelect from "react-select/creatable";
 
 type SelectOption = { value: string; label?: string; color?: string };
@@ -36,9 +36,6 @@ interface MultiSelectCellProps {
     readonly allowDuplicates?: boolean;
 }
 
-const BUBBLE_HEIGHT = 20;
-const BUBBLE_PADDING = 6;
-const BUBBLE_MARGIN = 4;
 /* This prefix is used when allowDuplicates is enabled to make sure that
 all underlying values are unique. */
 const VALUE_PREFIX = "__value";
@@ -131,10 +128,52 @@ const CustomMenu: React.FC<CustomMenuProps> = p => {
     return <Menu {...rest}>{children}</Menu>;
 };
 
+/**
+ * Custom MultiValueLabel component that allows text selection within pills.
+ * By default, react-select prevents text selection via onMouseDown preventDefault.
+ * We override this to allow users to select and copy text from the pills.
+ *
+ * Side effects:
+ * - Clicking on the pill label text won't focus the select input (click elsewhere to focus)
+ * - Clicking on the pill label text won't open the dropdown menu (click input area to open)
+ * - Removing pills via the X button still works normally (separate component)
+ * - Keyboard navigation still works normally
+ *
+ * Note on type assertions: react-select's MultiValueGenericProps.innerProps type is
+ * { className?: string }, but the underlying div element accepts all standard div props.
+ * The type assertion to React.ComponentPropsWithoutRef<"div"> is necessary to add
+ * event handlers that the actual DOM element supports.
+ */
+const SelectableMultiValueLabel: React.FC<MultiValueGenericProps<SelectOption>> = props => {
+    // Cast innerProps to the full div props type since react-select's types are overly restrictive
+    // (they only type { className?: string } but the div accepts all standard props)
+    const existingInnerProps = props.innerProps as React.ComponentPropsWithoutRef<"div"> | undefined;
+
+    const enhancedInnerProps: React.ComponentPropsWithoutRef<"div"> = {
+        ...existingInnerProps,
+        // Allow text selection by stopping propagation but not preventing default
+        onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => {
+            e.stopPropagation(); // Prevents react-select from treating it as a control click
+            existingInnerProps?.onMouseDown?.(e);
+        },
+        onTouchEnd: (e: React.TouchEvent<HTMLDivElement>) => {
+            e.stopPropagation();
+            existingInnerProps?.onTouchEnd?.(e);
+        },
+    };
+
+    return (
+        <components.MultiValueLabel
+            {...props}
+            innerProps={enhancedInnerProps as typeof props.innerProps}
+        />
+    );
+};
+
 export type MultiSelectCell = CustomCell<MultiSelectCellProps>;
 
 const Editor: ReturnType<ProvideEditorCallback<MultiSelectCell>> = p => {
-    const { value: cell, initialValue, onChange, onFinishedEditing } = p;
+    const { value: cell, initialValue, onChange, onFinishedEditing, portalElementRef } = p;
     const { options: optionsIn, values: valuesIn, allowCreation, allowDuplicates } = cell.data;
 
     const theme = useTheme();
@@ -162,11 +201,21 @@ const Editor: ReturnType<ProvideEditorCallback<MultiSelectCell>> = p => {
     // Apply styles to the react-select component.
     // All components: https://react-select.com/components
     const colorStyles: StylesConfig<SelectOption, true> = {
-        control: base => ({
+        control: (base, state) => ({
             ...base,
             border: 0,
             boxShadow: "none",
             backgroundColor: theme.bgCell,
+            // Allow interaction (e.g. wheel scrolling) even when the select is disabled
+            pointerEvents: state.isDisabled ? "auto" : base.pointerEvents,
+            cursor: state.isDisabled ? "default" : base.cursor,
+        }),
+        valueContainer: base => ({
+            ...base,
+            // Keep default wrapping so multiple chips can move to new lines
+            flexWrap: base.flexWrap ?? "wrap",
+            overflowX: "auto",
+            overflowY: "hidden",
         }),
         menu: styles => ({
             ...styles,
@@ -229,14 +278,16 @@ const Editor: ReturnType<ProvideEditorCallback<MultiSelectCell>> = p => {
             return {
                 ...styles,
                 backgroundColor: data.color ?? theme.bgBubble,
-                borderRadius: `${theme.roundingRadius ?? BUBBLE_HEIGHT / 2}px`,
+                borderRadius: `${theme.roundingRadius ?? theme.bubbleHeight / 2}px`,
+                flexShrink: 0,
+                whiteSpace: "nowrap",
             };
         },
         multiValueLabel: (styles, { data, isDisabled }) => {
             return {
                 ...styles,
-                paddingRight: isDisabled ? BUBBLE_PADDING : 0,
-                paddingLeft: BUBBLE_PADDING,
+                paddingRight: isDisabled ? theme.bubblePadding : 0,
+                paddingLeft: theme.bubblePadding,
                 paddingTop: 0,
                 paddingBottom: 0,
                 color: data.color
@@ -251,7 +302,8 @@ const Editor: ReturnType<ProvideEditorCallback<MultiSelectCell>> = p => {
                 justifyContent: "center",
                 alignItems: "center",
                 display: "flex",
-                height: BUBBLE_HEIGHT,
+                height: theme.bubbleHeight,
+                whiteSpace: "nowrap",
             };
         },
         multiValueRemove: (styles, { data, isDisabled, isFocused }) => {
@@ -270,7 +322,7 @@ const Editor: ReturnType<ProvideEditorCallback<MultiSelectCell>> = p => {
                         : "white"
                     : theme.textBubble,
                 backgroundColor: undefined,
-                borderRadius: isFocused ? `${theme.roundingRadius ?? BUBBLE_HEIGHT / 2}px` : undefined,
+                borderRadius: isFocused ? `${theme.roundingRadius ?? theme.bubbleHeight / 2}px` : undefined,
                 ":hover": {
                     cursor: "pointer",
                 },
@@ -346,7 +398,7 @@ const Editor: ReturnType<ProvideEditorCallback<MultiSelectCell>> = p => {
                 value={resolveValues(value, options, allowDuplicates)}
                 onKeyDown={cell.readonly ? undefined : handleKeyDown}
                 menuPlacement={"auto"}
-                menuPortalTarget={document.getElementById("portal")}
+                menuPortalTarget={portalElementRef?.current ?? document.getElementById("portal")}
                 autoFocus={true}
                 openMenuOnFocus={true}
                 openMenuOnClick={true}
@@ -357,6 +409,7 @@ const Editor: ReturnType<ProvideEditorCallback<MultiSelectCell>> = p => {
                 components={{
                     DropdownIndicator: () => null,
                     IndicatorSeparator: () => null,
+                    MultiValueLabel: SelectableMultiValueLabel,
                     Menu: props => {
                         if (menuDisabled) {
                             return null;
@@ -369,10 +422,10 @@ const Editor: ReturnType<ProvideEditorCallback<MultiSelectCell>> = p => {
                     },
                 }}
                 onChange={async e => {
-                    if (e === null) {
+                    if (e === null || !Array.isArray(e)) {
                         return;
                     }
-                    submitValues(e.map(x => x.value));
+                    submitValues(e.map((x: SelectOption) => x.value));
                 }}
             />
         </Wrap>
@@ -398,32 +451,32 @@ const renderer: CustomRenderer<MultiSelectCell> = {
             width: rect.width - 2 * theme.cellHorizontalPadding,
             height: rect.height - 2 * theme.cellVerticalPadding,
         };
-        const rows = Math.max(1, Math.floor(drawArea.height / (BUBBLE_HEIGHT + BUBBLE_PADDING)));
+        const rows = Math.max(1, Math.floor(drawArea.height / (theme.bubbleHeight + theme.bubblePadding)));
 
         let { x } = drawArea;
         let row = 1;
 
         let y =
             rows === 1
-                ? drawArea.y + (drawArea.height - BUBBLE_HEIGHT) / 2
-                : drawArea.y + (drawArea.height - rows * BUBBLE_HEIGHT - (rows - 1) * BUBBLE_PADDING) / 2;
+                ? drawArea.y + (drawArea.height - theme.bubbleHeight) / 2
+                : drawArea.y + (drawArea.height - rows * theme.bubbleHeight - (rows - 1) * theme.bubblePadding) / 2;
         for (const value of values) {
             const matchedOption = options.find(t => t.value === value);
             const color = matchedOption?.color ?? (highlighted ? theme.bgBubbleSelected : theme.bgBubble);
             const displayText = matchedOption?.label ?? value;
             const metrics = measureTextCached(displayText, ctx);
-            const width = metrics.width + BUBBLE_PADDING * 2;
-            const textY = BUBBLE_HEIGHT / 2;
+            const width = metrics.width + theme.bubblePadding * 2;
+            const textY = theme.bubbleHeight / 2;
 
             if (x !== drawArea.x && x + width > drawArea.x + drawArea.width && row < rows) {
                 row++;
-                y += BUBBLE_HEIGHT + BUBBLE_PADDING;
+                y += theme.bubbleHeight + theme.bubblePadding;
                 x = drawArea.x;
             }
 
             ctx.fillStyle = color;
             ctx.beginPath();
-            roundedRect(ctx, x, y, width, BUBBLE_HEIGHT, theme.roundingRadius ?? BUBBLE_HEIGHT / 2);
+            roundedRect(ctx, x, y, width, theme.bubbleHeight, theme.roundingRadius ?? theme.bubbleHeight / 2);
             ctx.fill();
 
             // If a color is set for this option, we use either black or white as the text color depending on the background.
@@ -433,9 +486,9 @@ const renderer: CustomRenderer<MultiSelectCell> = {
                     ? "#000000"
                     : "#ffffff"
                 : theme.textBubble;
-            ctx.fillText(displayText, x + BUBBLE_PADDING, y + textY + getMiddleCenterBias(ctx, theme));
+            ctx.fillText(displayText, x + theme.bubblePadding, y + textY + getMiddleCenterBias(ctx, theme));
 
-            x += width + BUBBLE_MARGIN;
+            x += width + theme.bubbleMargin;
             if (x > drawArea.x + drawArea.width + theme.cellHorizontalPadding && row >= rows) {
                 break;
             }
@@ -443,11 +496,11 @@ const renderer: CustomRenderer<MultiSelectCell> = {
 
         return true;
     },
-    measure: (ctx, cell, t) => {
+    measure: (ctx, cell, theme) => {
         const { values, options } = cell.data;
 
         if (!values) {
-            return t.cellHorizontalPadding * 2;
+            return theme.cellHorizontalPadding * 2;
         }
 
         // Resolve the values to the actual display labels:
@@ -455,11 +508,16 @@ const renderer: CustomRenderer<MultiSelectCell> = {
             x => x.label ?? x.value
         );
 
-        return (
-            labels.reduce((acc, data) => ctx.measureText(data).width + acc + BUBBLE_PADDING * 2 + BUBBLE_MARGIN, 0) +
-            2 * t.cellHorizontalPadding -
-            4
+        const bubblesWidth = labels.reduce(
+            (acc, data) => ctx.measureText(data).width + acc + theme.bubblePadding * 2 + theme.bubbleMargin,
+            0
         );
+
+        if (labels.length === 0) {
+            return theme.cellHorizontalPadding * 2;
+        }
+
+        return bubblesWidth + 2 * theme.cellHorizontalPadding - theme.bubbleMargin;
     },
     provideEditor: () => ({
         editor: Editor,

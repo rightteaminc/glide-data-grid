@@ -105,7 +105,6 @@ export function lossyCopyData<T extends EditableGridCell>(source: EditableGridCe
             }
             // No default
         }
-    assertNever(target);
 }
 
 export type GridColumnWithMockingInfo = GridColumn & {
@@ -238,7 +237,7 @@ interface BeautifulProps {
     scale?: string;
 }
 
-export const BeautifulWrapper: React.FC<BeautifulProps> = p => {
+export const BeautifulWrapper: React.FC<React.PropsWithChildren<BeautifulProps>> = p => {
     const { title, children, description, className, scale } = p;
 
     const { ref, width, height } = useResizeDetector();
@@ -730,7 +729,14 @@ Try out [Glide](https://www.glideapps.com/)
             getContent: () => {
                 return {
                     kind: GridCellKind.Bubble,
-                    data: [faker.lorem.word(), faker.lorem.word(), faker.lorem.word()],
+                    data: [
+                        faker.lorem.word(),
+                        faker.lorem.word(),
+                        faker.lorem.word(),
+                        faker.lorem.words(2),
+                        faker.lorem.words(2),
+                        faker.lorem.words(2),
+                    ],
                     allowOverlay: true,
                 };
             },
@@ -807,7 +813,7 @@ export function useAllMockedKinds() {
                 const copied = lossyCopyData(val, current);
                 cache.current.set(col, row, {
                     ...copied,
-                    displayData: noDisplay === true ? undefined : copied.data?.toString() ?? "",
+                    displayData: noDisplay === true ? undefined : (copied.data?.toString() ?? ""),
                 } as any);
 
                 if (forceUpdate === true) {
